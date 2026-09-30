@@ -205,17 +205,17 @@ class DiagnosticsModel(app: Application): AndroidViewModel(app) {
         }
         val started = android.os.SystemClock.elapsedRealtime()
         val tracker = guide?.let { GuideTracker(it, started) }
-        mutable.update { it.copy(monitoring = true, busy = true, guide = guide, guidance = guide?.let { GuideProgress("Recording started. Follow the instructions; do not exceed the stated hold time.") }, status = "Recording • keep app open") }
+        mutable.update { it.copy(monitoring = true, busy = true, guide = guide, guidance = guide?.let { GuideProgress(if(it.loaded) "Recording setup and loaded data. Follow the operator/course plan; no target duration." else "Recording started. Follow the instructions; do not exceed the stated hold time.") }, status = "Recording • keep app open") }
         guideDeadline?.cancel()
         if(guide != null) guideDeadline = viewModelScope.launch {
             delay(guide.maxSeconds * 1000L)
-            if(state.value.monitoring) mutable.update { it.copy(monitoring = false, guidance = GuideProgress("Time limit reached. ${if(guide == Guide.NEUTRAL) "Release the accelerator now." else "Review after parking."} Recording may be insufficient; do not extend the test.", terminal = true), status = "Test time limit reached • finishing current reading") }
+            if(state.value.monitoring) mutable.update { it.copy(monitoring = false, guidance = (it.guidance ?: GuideProgress("")).copy(text = "Time limit reached. ${if(guide.loaded) "Follow the operator/course plan; no pass/fail assessment." else if(guide == Guide.NEUTRAL) "Release the accelerator now." else "Review after parking."} Recording may be insufficient; do not extend the test.", terminal = true, complete = false, qualifying = false), status = "Test time limit reached • finishing current reading") }
         }
         operation = viewModelScope.launch(Dispatchers.IO) {
             try {
-                if(guide != null) event("guide_start", JSONObject().put("guide", guide.name).put("instructions", guide.instructions))
+                if(guide != null) event("guide_start", JSONObject().put("guide", guide.name).put("instructions", guide.instructions).put("purpose", guide.purpose).put("measurement_limits", if(guide.loaded) guide.evidence else "Generic OBD guide"))
                 val available = Obd.pids.filter { state.value.supported?.contains(it.code) != false }
-                val selected = if(guide == Guide.NEUTRAL) available.filter { it.code in guide.required || it.code in setOf("03", "06", "07", "08", "09") } else available
+                val selected = if(guide == Guide.NEUTRAL) available.filter { it.code in guide.required || it.code in setOf("03", "06", "07", "08", "09") } else if(guide?.loaded == true) available.filter { it.code in guide.required || it.code in setOf("11", "0F", "0B", "0E", "10", "44", "03") } else available
                 val ordered = selected.sortedBy { if(it.code in (guide?.required ?: emptySet())) 0 else 1 }
                 check(ordered.isNotEmpty()) { "No supported live PIDs available." }
                 while(isActive && state.value.monitoring) {
@@ -244,7 +244,7 @@ class DiagnosticsModel(app: Application): AndroidViewModel(app) {
     }
     fun stopMonitoring() {
         guideDeadline?.cancel()
-        mutable.update { it.copy(monitoring = false, guidance = it.guide?.let { _ -> GuideProgress("Stopped by owner; data may be incomplete.", terminal = true) }, status = "Finishing current PID…") }
+        mutable.update { it.copy(monitoring = false, guidance = it.guide?.let { _ -> (it.guidance ?: GuideProgress("")).copy(text = if(it.guide?.loaded == true) "Loaded session stopped by owner. Review marked samples with external instruments; no pass/fail assessment." else "Stopped by owner; data may be incomplete.", terminal = true, complete = false, qualifying = false) }, status = "Finishing current PID…") }
     }
     fun scan() {
         if(!state.value.connected || state.value.busy || state.value.aiBusy) return

@@ -50,4 +50,52 @@ class GuidanceTest {
         assertTrue(Vehicles.profile("370z-2009", "").contains("NOT confirmed"))
         assertTrue(Vehicles.all.all { it.details.contains("manual") && it.details.contains("93 octane") })
     }
+
+    @Test fun loadedGuidesAreFifthAndSixthAndHaveDistinctRequiredChannels() {
+        assertEquals(Guide.TRACK, Guide.entries[4]); assertEquals(Guide.DYNO, Guide.entries[5])
+        assertTrue("0D" in Guide.TRACK.required); assertFalse("0D" in Guide.DYNO.required)
+    }
+    @Test fun trackRequiresMovementButDoesNotAbortForMovement() {
+        val tracker = GuideTracker(Guide.TRACK, 0)
+        val loaded = readings(rpm = 4000.0, speed = 80.0) + ("04" to 85.0)
+        val result = tracker.accept(loaded, 1000)
+        assertTrue(result.qualifying); assertFalse(result.terminal)
+        assertFalse(tracker.accept(loaded + ("0D" to 0.0), 2000).qualifying)
+    }
+    @Test fun dynoSupportsZeroOrUnavailableWheelSpeed() {
+        for(data in listOf(readings(speed = 0.0), readings() - "0D")) {
+            val result = GuideTracker(Guide.DYNO, 0).accept(data + ("04" to 85.0), 1000)
+            assertTrue(result.qualifying); assertFalse(result.terminal)
+        }
+    }
+    @Test fun loadedCaptureNeverDeclaresAnAutomaticPass() {
+        for(guide in listOf(Guide.TRACK, Guide.DYNO)) {
+            val tracker = GuideTracker(guide, 0)
+            val data = readings(rpm = 4000.0, speed = 80.0) + ("04" to 85.0)
+            for(second in 0..590 step 5) {
+                val result = tracker.accept(data, second * 1000L)
+                assertFalse(result.complete); assertFalse(result.terminal)
+            }
+            val end = tracker.accept(data, 600000)
+            assertTrue(end.terminal); assertFalse(end.complete); assertTrue(end.text.contains("No pass/fail"))
+        }
+    }
+    @Test fun loadedMissingChannelsAndTemperatureStillStopCapture() {
+        for(guide in listOf(Guide.TRACK, Guide.DYNO)) {
+            val tracker = GuideTracker(guide, 0)
+            val missing = readings() - "04"
+            tracker.accept(missing, 1000); tracker.accept(missing, 2000)
+            assertTrue(tracker.accept(missing, 3000).terminal)
+            assertTrue(GuideTracker(guide, 0).accept(readings(coolant = 111.0), 1000).terminal)
+        }
+    }
+    @Test fun loadedCoverageExcludesCooldownAndLongGaps() {
+        val tracker = GuideTracker(Guide.DYNO, 0)
+        val loaded = readings() + ("04" to 85.0)
+        tracker.accept(loaded, 0)
+        assertEquals(5, tracker.accept(loaded, 5000).seconds)
+        assertFalse(tracker.accept(readings(), 10000).qualifying)
+        assertEquals(5, tracker.accept(loaded, 15000).seconds)
+        assertEquals(5, tracker.accept(loaded, 40000).seconds)
+    }
 }

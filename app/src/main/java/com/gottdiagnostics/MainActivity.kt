@@ -113,16 +113,16 @@ class MainActivity: ComponentActivity() {
                         Text(guide.title, style = MaterialTheme.typography.titleLarge)
                         RacePanel("01 / SET UP", guide.instructions, RaceAccent)
                         RacePanel("02 / WHAT YOU WILL LEARN", guide.purpose)
-                        RacePanel("STOP CONDITIONS", guide.abort, RaceRed)
+                        RacePanel("STOP CONDITIONS", guide.abort + if(guide.loaded) " Also abort for the operator's wideband, pressure, temperature or knock limits; wheel slip, loss of traction, fluid leaks or dyno restraint issues. Logging stops cannot stop the vehicle or dyno." else "", RaceRed)
+                        if(guide.loaded) RacePanel("MEASUREMENT LIMITS", guide.evidence, RaceWhite)
                         Text("Required channels: " + guide.required.joinToString { code -> Obd.pids.first { it.code == code }.name }, style = MaterialTheme.typography.bodySmall, color = RaceMuted)
-                        Row { Checkbox(checked = ready, onCheckedChange = { ready = it }, enabled = !state.busy); Text("I am parked, have read the steps and stop conditions, and will not handle the phone while driving.", Modifier.padding(top = 8.dp)) }
+                        Row { Checkbox(checked = ready, onCheckedChange = { ready = it }, enabled = !state.busy); Text(if(guide.loaded) "I am parked, using a closed course or professional dyno, have verified the vehicle and run plan with the operator/instructor, and will not handle the phone during a run." else "I am parked, have read the steps and stop conditions, and will not handle the phone while driving.", Modifier.padding(top = 8.dp)) }
                         Button(onClick = { model.monitor(guide); ready = false }, enabled = ready && state.connected && !state.busy && !state.aiBusy, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("START GUIDED RECORDING") }
                         state.guidance?.let { progress ->
-                            RacePanel(if(progress.complete) "CAPTURE COMPLETE" else "SESSION PROGRESS", "${state.guide?.title ?: "Recording"}\n${progress.text}\nApproximate qualifying coverage: ${progress.seconds} s • ${progress.samples} readings", if(progress.complete) RaceAccent else RaceWhite)
+                            RacePanel(if(progress.complete) "CAPTURE COMPLETE" else "SESSION PROGRESS", "${state.guide?.title ?: "Recording"}\n${progress.text}\nApproximate marked coverage: ${progress.seconds} s • ${progress.samples} readings", if(progress.complete) RaceAccent else RaceWhite)
                         }
                         if(state.vehicleId == "350z-2003") Text("2003 DE: unknown injectors and calibration. Identify them and verify matching calibration before high-load fueling evaluation.", color = MaterialTheme.colorScheme.error)
-                        Text("High-load / dyno testing", style = MaterialTheme.typography.titleMedium)
-                        Text("Arrange a qualified tuner and controlled dyno with appropriate instrumentation. No full-throttle road guide is offered. Generic OBD data cannot establish safe fueling under load.")
+
                     }
                     2 -> {
                         RaceHeading("03 / TELEMETRY", "Live cockpit.", if(state.connected) state.vehicle.title else if(state.values.isEmpty()) "Connect to see your engine data." else "Last recorded values • reconnect to update.")

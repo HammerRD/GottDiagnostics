@@ -1,18 +1,18 @@
-# Gott Diagnostics 1.5
+# Gott Diagnostics 1.6
 
 Native Kotlin / Jetpack Compose Android app for an OBDLink MX+ using Bluetooth Classic SPP. Android 8.0+ (API 26). Includes guided OBD recording and direct, owner-approved OpenAI analysis inside the app.
 
 ## Install
 
-Download `gott-diagnostics-debug.apk` from the GitHub release assets and open it on your phone. Allow installation from the file-opening app. These are development builds, not production-signed releases. The GitHub runner generates a debug signing key for each build, so Android may reject an in-place update. If an earlier version is installed, export any logs you want to keep before uninstalling it and installing 1.5. Uninstalling clears app data. The API key must be entered again after reinstalling. The release's SHA256SUMS.txt identifies the downloadable APK; a local build has a different signing key/checksum.
+Download `gott-diagnostics-debug.apk` from the GitHub release assets and open it on your phone. Allow installation from the file-opening app. These are development builds, not production-signed releases. The GitHub runner generates a debug signing key for each build, so Android may reject an in-place update. If an earlier version is installed, export any logs you want to keep before uninstalling it and installing 1.6. Uninstalling clears app data. The API key must be entered again after reinstalling. The release's SHA256SUMS.txt identifies the downloadable APK; a local build has a different signing key/checksum.
 
 ## Motorsport interface
 
 The garage uses large personal-photo cards. In Garage, choose Add car photo for each vehicle: white 2003 350Z, red 2006 350Z, and silver 2009 370Z. The Android file picker gives access only to the image you choose. Photo access is saved across app restarts; you can change or remove each photo. Keep the source image on your phone. Photos stay out of diagnostic exports and AI requests. No stock or generated car photos are bundled; until you choose one, the card shows a paint-color label and photo prompt. The red, white and black theme, segmented RPM display and two-column telemetry dashboard remain. All six destinations remain visible in the bottom navigation: Link, Guides, Live, Codes, Garage and AI. Scroll position resets when switching sections, and the Stop recording button stays above the content while recording.
 
-The RPM display is a visual scale, not an ECU redline or a recommended target. Offline/missing readings show dashes and NO DATA; stopped readings are labeled LAST READING. Your selected car photo appears in both the Garage and Paddock. The engine protocols, guide conditions, privacy controls and API behavior are unchanged.
+The RPM display is a visual scale, not an ECU redline or a recommended target. Offline/missing readings show dashes and NO DATA; stopped readings are labeled LAST READING. Your selected car photo appears in both the Garage and Paddock. Read-only engine protocols and API consent controls remain in place.
 
-Version 1.4 photo-card captures (version 1.5 also adds an ADD NEW CAR button above the garage):
+Version 1.4 photo-card captures (version 1.6 also adds an ADD NEW CAR button above the garage):
 
 | Paddock | Live cockpit | Garage |
 |---|---|---|
@@ -49,14 +49,19 @@ Without an API key the app still records, scans, guides and exports. No account 
 
 Guides use conservative heuristics, not Nissan factory test procedures. They check advertised required PIDs first. Missing readings never count as zero or as a valid condition.
 
-- **Cold start:** cool for at least 6 hours; connect with ignition on/engine off. Start recording, wait for the engine-start instruction, then start without throttle. Initial coolant and intake temperatures must be within 10 °C; this alone does not prove a full cold soak. Capture about 120 seconds of running data; 5-minute overall cap.
-- **Warm idle:** stationary, neutral, parking brake on, outdoors, A/C off. Looks for 75–105 °C coolant and 550–1,200 RPM. Targets 60 seconds of qualifying data, with a 10-minute cap.
-- **Brief neutral RPM:** only warm and normally running. Gently hold 2,000–2,500 RPM, never redline or blip. A separate timer stops recording **15 seconds after Start**, regardless of PID coverage. Release the accelerator when it stops; never extend the hold to satisfy progress. Targets at least 10 seconds of sampled qualifying coverage and 4 samples; slow adapters may yield incomplete data.
-- **Steady normal driving:** set up while parked, secure the phone, avoid interaction while moving, and have a passenger operate it if needed. Observe legal driving without hard acceleration or lugging. Looks for coolant 75–105 °C, speed >15 km/h, RPM 1,200–3,500, reported load ≤60%, and speed changes ≤8 km/h between samples. Targets 90 seconds of qualifying coverage; 10-minute cap. Never alter driving to chase the timer.
+1. **Cold start:** cool for at least 6 hours; connect with ignition on/engine off. Start recording, wait for the engine-start instruction, then start without throttle. Initial coolant and intake temperatures must be within 10 °C; this alone does not prove a full cold soak. Capture about 120 seconds of running data; 5-minute overall cap.
+2. **Warm idle:** stationary, neutral, parking brake on, outdoors, A/C off. Looks for 75–105 °C coolant and 550–1,200 RPM. Targets 60 seconds of qualifying data, with a 10-minute cap.
+3. **Brief neutral RPM:** only warm and normally running. Gently hold 2,000–2,500 RPM, never redline or blip. A separate timer stops recording **15 seconds after Start**, regardless of PID coverage. Release the accelerator when it stops; never extend the hold to satisfy progress. Targets at least 10 seconds of sampled qualifying coverage and 4 samples; slow adapters may yield incomplete data.
+4. **Steady normal driving:** set up while parked, secure the phone, avoid interaction while moving, and have a passenger operate it if needed. Observe legal driving without hard acceleration or lugging. Looks for coolant 75–105 °C, speed >15 km/h, RPM 1,200–3,500, reported load ≤60%, and speed changes ≤8 km/h between samples. Targets 90 seconds of qualifying coverage; 10-minute cap. Never alter driving to chase the timer.
+
+5. **Closed-course high load:** agree the run plan and vehicle-specific limits with your instructor/tuner, verify the car and calibration, start recording while parked, run only on an appropriate closed course, then cool down and review after parking. RPM, speed, coolant and calculated load are required.
+6. **Dyno testing:** a qualified operator handles restraints, airflow, extraction, gear, ramp/load and limits. Start recording before the operator's test and stop after unloading/cooldown. RPM, coolant and calculated load are required; speed is optional.
+
+Both loaded guides record for up to ten minutes or until stopped; that cap is a logging limit, not permission to sustain high load. There is no duration target or automatic pass/fail. Calculated load ≥70% with the engine running marks samples for review (track also requires movement). This heuristic is not proof of wide-open throttle, a safe tune, or a driving target. Focused polling includes supported throttle, intake temperature, MAP, ignition advance, MAF, commanded equivalence ratio and fuel-system status. Generic OBD is sequential and may miss brief events. Use independent wideband lambda/AFR and appropriate fuel/oil pressure, temperature and knock instrumentation. These external channels are not imported or synchronized by this release. The app does not control a dyno or write ECU settings.
 
 High coolant temperature (>110 °C) stops a guide. Movement stops stationary guides; RPM above 3,000 stops the neutral guide. Stop for an oil-pressure warning, flashing MIL, overheating, knocking or severe rough running; the app cannot detect all unsafe conditions. For driving sessions, pull over safely before interacting with the phone. Keep the app open; it keeps the screen awake while recording but does not run a background service.
 
-Neutral revving does not reproduce road load and cannot validate a performance tune. For high-load work use a qualified tuner, controlled dyno and suitable instrumentation. Identify the 2003's injectors and confirm matching calibration first. There is no full-throttle road guide.
+Neutral revving does not reproduce road load and cannot validate a performance tune. For high-load work use a qualified instructor/tuner, a suitable closed course or controlled dyno, and appropriate instrumentation. Identify the 2003's injectors and confirm matching calibration first. High-load capture is offered only for closed-course use or a professional dyno, not public-road testing.
 
 ## Data and privacy
 

@@ -7,7 +7,7 @@ android {
     namespace = "com.gottdiagnostics"
     compileSdk = 35
     buildToolsVersion = "35.0.0"
-    defaultConfig { applicationId = "com.gottdiagnostics"; minSdk = 26; targetSdk = 35; versionCode = 6; versionName = "1.5" }
+    defaultConfig { applicationId = "com.gottdiagnostics"; minSdk = 26; targetSdk = 35; versionCode = 7; versionName = "1.6" }
     buildFeatures { compose = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }

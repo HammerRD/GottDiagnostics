@@ -181,7 +181,7 @@ internal fun vehicleAccent(id: String) = when(id) { "350z-2006" -> RaceAccent; "
         color = if(selected) RaceAccent.copy(alpha=.08f) else RacePanel, shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, if(selected) RaceAccent else RaceLine)) {
         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("0${guide.ordinal+1}", fontFamily = FontFamily.Monospace, fontSize = 23.sp, color = if(selected) RaceAccent else RaceMuted)
-            Column(Modifier.weight(1f)) { Text(guide.title, style=MaterialTheme.typography.titleMedium); RaceEyebrow(if(guide == Guide.CRUISE) "NORMAL ROAD LOAD" else "STATIONARY / NEUTRAL", RaceMuted) }
+            Column(Modifier.weight(1f)) { Text(guide.title, style=MaterialTheme.typography.titleMedium); RaceEyebrow(guide.category, RaceMuted) }
             Text(if(selected) "●" else "○", color = if(selected) RaceAccent else RaceMuted)
         }
     }
