@@ -145,13 +145,13 @@ internal fun vehicleAccent(id: String) = when(id) { "350z-2006" -> RaceAccent; "
         Box(Modifier.background(Brush.linearGradient(listOf(accent.copy(alpha = 0.10f), Color.Transparent)))) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    RaceEyebrow(if(compact) "${vehicle.title.take(4)} / NISSAN" else "SELECTED / NISSAN", accent)
-                    if(selected) RaceBadge(if(compact) "SELECTED" else "6MT • 93 OCT", accent)
+                    RaceEyebrow(if(compact) "${vehicle.title.take(4)} / ${vehicle.make.uppercase(Locale.US)}" else "SELECTED / ${vehicle.make.uppercase(Locale.US)}", accent)
+                    if(selected) RaceBadge(if(compact) "SELECTED" else if(vehicle.id.startsWith("custom-")) "YOUR CAR" else "6MT • 93 OCT", accent)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(vehicle.title.removePrefix(vehicle.title.take(5)), style = MaterialTheme.typography.headlineLarge.copy(fontSize = if(compact) 30.sp else 40.sp))
-                        RaceEyebrow(when(vehicle.id) { "350z-2006" -> "VQ35DE REV-UP"; "370z-2009" -> "VQ37VHR / UPREV"; else -> "VQ35DE / MODIFIED" }, RaceMuted)
+                        RaceEyebrow(when(vehicle.id) { "350z-2006" -> "VQ35DE REV-UP"; "370z-2009" -> "VQ37VHR / UPREV"; "350z-2003" -> "VQ35DE / MODIFIED"; else -> vehicle.paint.uppercase(Locale.US) }, RaceMuted)
                     }
 
                 }
@@ -159,7 +159,7 @@ internal fun vehicleAccent(id: String) = when(id) { "350z-2006" -> RaceAccent; "
                 if(!compact) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         RaceEyebrow("${vehicle.title.take(4)} MODEL", RaceMuted)
-                        RaceEyebrow("REAR-WHEEL DRIVE", RaceMuted)
+                        RaceEyebrow(if(vehicle.id.startsWith("custom-")) "OWNER PROFILE" else "REAR-WHEEL DRIVE", RaceMuted)
                     }
                 }
             }

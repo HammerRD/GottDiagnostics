@@ -19,12 +19,6 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-internal fun vehiclePaint(id: String) = when(id) {
-    "350z-2006" -> "RED"
-    "370z-2009" -> "SILVER"
-    else -> "WHITE"
-}
-
 /** Images stay on the phone; their URI is never included in diagnostic exports or AI requests. */
 @Composable internal fun VehiclePhoto(vehicle: Vehicle, uri: String?, modifier: Modifier = Modifier) {
     val context = LocalContext.current
@@ -37,12 +31,12 @@ internal fun vehiclePaint(id: String) = when(id) {
     Box(modifier.background(RacePanel), contentAlignment = Alignment.Center) {
         val image = bitmap
         if(image != null) {
-            Image(image.asImageBitmap(), "${vehiclePaint(vehicle.id)} ${vehicle.title}",
+            Image(image.asImageBitmap(), "${vehicle.paint} ${vehicle.title}",
                 Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
         } else {
             Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                RaceEyebrow("${vehiclePaint(vehicle.id)} / NISSAN", vehicleAccent(vehicle.id))
+                RaceEyebrow("${vehicle.paint} / ${vehicle.make.uppercase(java.util.Locale.US)}", vehicleAccent(vehicle.id))
                 Text(if(uri == null) "Add your car photo in Garage" else "Photo unavailable — choose it again in Garage", color = RaceMuted)
             }
         }

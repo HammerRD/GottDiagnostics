@@ -1,18 +1,18 @@
-# Gott Diagnostics 1.4
+# Gott Diagnostics 1.5
 
 Native Kotlin / Jetpack Compose Android app for an OBDLink MX+ using Bluetooth Classic SPP. Android 8.0+ (API 26). Includes guided OBD recording and direct, owner-approved OpenAI analysis inside the app.
 
 ## Install
 
-Download `gott-diagnostics-debug.apk` from the GitHub release assets and open it on your phone. Allow installation from the file-opening app. These are development builds, not production-signed releases. The GitHub runner generates a debug signing key for each build, so Android may reject an in-place update. If an earlier version is installed, export any logs you want to keep before uninstalling it and installing 1.4. Uninstalling clears app data. The API key must be entered again after reinstalling. The release's SHA256SUMS.txt identifies the downloadable APK; a local build has a different signing key/checksum.
+Download `gott-diagnostics-debug.apk` from the GitHub release assets and open it on your phone. Allow installation from the file-opening app. These are development builds, not production-signed releases. The GitHub runner generates a debug signing key for each build, so Android may reject an in-place update. If an earlier version is installed, export any logs you want to keep before uninstalling it and installing 1.5. Uninstalling clears app data. The API key must be entered again after reinstalling. The release's SHA256SUMS.txt identifies the downloadable APK; a local build has a different signing key/checksum.
 
 ## Motorsport interface
 
-Version 1.4 replaces the coupe drawings with large personal-photo cards. In Garage, choose Add car photo for each vehicle: white 2003 350Z, red 2006 350Z, and silver 2009 370Z. The Android file picker gives access only to the image you choose. Photo access is saved across app restarts; you can change or remove each photo. Keep the source image on your phone. Photos stay out of diagnostic exports and AI requests. No stock or generated car photos are bundled; until you choose one, the card shows a paint-color label and photo prompt. The red, white and black theme, segmented RPM display and two-column telemetry dashboard remain. All six destinations remain visible in the bottom navigation: Link, Guides, Live, Codes, Garage and AI. Scroll position resets when switching sections, and the Stop recording button stays above the content while recording.
+The garage uses large personal-photo cards. In Garage, choose Add car photo for each vehicle: white 2003 350Z, red 2006 350Z, and silver 2009 370Z. The Android file picker gives access only to the image you choose. Photo access is saved across app restarts; you can change or remove each photo. Keep the source image on your phone. Photos stay out of diagnostic exports and AI requests. No stock or generated car photos are bundled; until you choose one, the card shows a paint-color label and photo prompt. The red, white and black theme, segmented RPM display and two-column telemetry dashboard remain. All six destinations remain visible in the bottom navigation: Link, Guides, Live, Codes, Garage and AI. Scroll position resets when switching sections, and the Stop recording button stays above the content while recording.
 
 The RPM display is a visual scale, not an ECU redline or a recommended target. Offline/missing readings show dashes and NO DATA; stopped readings are labeled LAST READING. Your selected car photo appears in both the Garage and Paddock. The engine protocols, guide conditions, privacy controls and API behavior are unchanged.
 
-Phone-size captures from the actual Compose UI, rendered locally in Android's host test runtime (offline, no simulated vehicle readings):
+Version 1.4 photo-card captures (version 1.5 also adds an ADD NEW CAR button above the garage):
 
 | Paddock | Live cockpit | Garage |
 |---|---|---|
@@ -20,7 +20,14 @@ Phone-size captures from the actual Compose UI, rendered locally in Android's ho
 
 ## Your garage
 
-Choose a vehicle before connecting; all are manual transmission and run owner-reported 93 octane (AKI versus RON was not specified).
+Use **Garage → ADD NEW CAR** to enter year, make, model/trim, paint color, and engine/transmission/fuel/modification/tune details. The new car is saved and selected automatically. Add its photo and symptoms just like the original cars. Disconnect before adding or switching vehicles.
+
+Every saved car uses the same Bluetooth Classic connection, supported live PIDs, DTC scans, logging, generic guided checks, anomaly heuristics, exports, and personal-key AI analysis. Availability depends on ECU/OBD support; manufacturer-specific modules and ECU tuning writes are not added. Generic engine guides and thresholds are not factory specifications for every engine or transmission.
+
+AI analysis and backup exports now choose the latest recording for the selected car. Switching cars clears displayed readings, codes and AI conversation so they are not attributed to the wrong vehicle. Recordings preserve the profile captured at connection time. Existing Nissan logs remain matched by their original profile header; new logs include a stable vehicle ID.
+
+
+The three original profiles are manual transmission and run owner-reported 93 octane (AKI versus RON was not specified).
 
 - White 2003 350Z VQ35DE: upgraded injectors of unknown specification, aftermarket exhaust; matching calibration unknown.
 - Red 2006 350Z VQ35DE Rev-Up: Kinetix intake manifold, full exhaust, high-flow catalytic converters; tune unknown.

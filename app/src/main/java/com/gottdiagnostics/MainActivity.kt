@@ -39,6 +39,7 @@ class MainActivity: ComponentActivity() {
     }
     @Composable private fun DiagnosticsScreen(model: DiagnosticsModel = viewModel()) {
         val state by model.state.collectAsState()
+        var addingVehicle by rememberSaveable { mutableStateOf(false) }
         var tab by rememberSaveable { mutableIntStateOf(0) }
         var message by remember { mutableStateOf("") }
         var guide by rememberSaveable { mutableStateOf(Guide.IDLE) }
@@ -46,7 +47,7 @@ class MainActivity: ComponentActivity() {
         var apiKey by remember { mutableStateOf("") }
         val scope = rememberCoroutineScope()
         val photoPrefs = remember { getSharedPreferences("vehicle_photos", MODE_PRIVATE) }
-        var photos by remember { mutableStateOf(Vehicles.all.associate { it.id to photoPrefs.getString(it.id, null) }) }
+        var photos by remember { mutableStateOf(state.vehicles.associate { it.id to photoPrefs.getString(it.id, null) }) }
         var photoVehicle by rememberSaveable { mutableStateOf<String?>(null) }
         val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             val id = photoVehicle
@@ -71,6 +72,10 @@ class MainActivity: ComponentActivity() {
             onDispose { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or WindowManager.LayoutParams.FLAG_SECURE) }
         }
         val editable = !state.connected && !state.busy && !state.aiBusy
+        if(addingVehicle) {
+            AddVehicleForm(onDismiss = { addingVehicle = false }, onSave = model::addVehicle)
+            return
+        }
         Column(Modifier.safeDrawingPadding().imePadding().padding(horizontal = 16.dp)) {
             RaceHeader(state)
             Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -86,7 +91,7 @@ class MainActivity: ComponentActivity() {
                 when(tab) {
                     0 -> {
                         RaceHeading("01 / PADDOCK", "Your pit wall.", "Connect your machine. Find the story in the data.")
-                        VehicleHero(Vehicles.get(state.vehicleId), photoUri = photos[state.vehicleId])
+                        VehicleHero(state.vehicle, photoUri = photos[state.vehicleId])
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             OutlinedButton(onClick = { tab = 4 }, modifier = Modifier.weight(1f)) { Text("OPEN GARAGE") }
                             OutlinedButton(onClick = { tab = 2 }, modifier = Modifier.weight(1f)) { Text("LIVE COCKPIT") }
@@ -103,7 +108,7 @@ class MainActivity: ComponentActivity() {
                     }
                     1 -> {
                         RaceHeading("02 / GUIDED SESSIONS", "Run a better check.", "The right conditions. More useful data.")
-                        Text("Neutral RPM is not a substitute for road load. These are conservative collection guides, not Nissan factory test procedures.", color = RaceMuted)
+                        Text("Neutral RPM is not a substitute for road load. These are generic combustion-engine guides, not vehicle-specific factory procedures. Check the manufacturer instructions for your engine and transmission; use Park or Neutral as appropriate. The displayed temperature and RPM windows may not suit every vehicle.", color = RaceMuted)
                         Guide.entries.forEach { item -> GuideOption(item, guide == item, !state.busy) { guide = item } }
                         Text(guide.title, style = MaterialTheme.typography.titleLarge)
                         RacePanel("01 / SET UP", guide.instructions, RaceAccent)
@@ -120,7 +125,7 @@ class MainActivity: ComponentActivity() {
                         Text("Arrange a qualified tuner and controlled dyno with appropriate instrumentation. No full-throttle road guide is offered. Generic OBD data cannot establish safe fueling under load.")
                     }
                     2 -> {
-                        RaceHeading("03 / TELEMETRY", "Live cockpit.", if(state.connected) Vehicles.get(state.vehicleId).title else if(state.values.isEmpty()) "Connect to see your engine data." else "Last recorded values • reconnect to update.")
+                        RaceHeading("03 / TELEMETRY", "Live cockpit.", if(state.connected) state.vehicle.title else if(state.values.isEmpty()) "Connect to see your engine data." else "Last recorded values • reconnect to update.")
                         Button(onClick = { model.monitor() }, enabled = state.connected && !state.busy && !state.aiBusy, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("START RECORDING") }
                         Tachometer(state)
                         val headlinePids = listOf("0D", "05", "04", "42", "10", "11")
@@ -159,9 +164,10 @@ class MainActivity: ComponentActivity() {
                         Text("Not enabled: verified ECU-specific procedures and compatible write access have not been established for these cars. This app sends only adapter setup and OBD read requests. Use the supported UpRev workflow for the 370Z's calibration. AI cannot execute vehicle commands.")
                     }
                     4 -> {
-                        RaceHeading("05 / THE LINEUP", "Built to be driven.", "Three machines. Three different stories.")
+                        RaceHeading("05 / THE LINEUP", "Built to be driven.", "${state.vehicles.size} cars. Your garage.")
+                        Button(onClick = { addingVehicle = true }, enabled = editable, modifier = Modifier.fillMaxWidth()) { Text("ADD NEW CAR") }
                         Text("Your car photos stay on this phone and are not sent with diagnostics or AI requests.", color = RaceMuted)
-                        Vehicles.all.forEach { vehicle ->
+                        state.vehicles.forEach { vehicle ->
                             VehicleHero(vehicle, state.vehicleId == vehicle.id, compact = true, enabled = editable,
                                 onClick = { model.selectVehicle(vehicle.id) }, photoUri = photos[vehicle.id])
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -179,7 +185,7 @@ class MainActivity: ComponentActivity() {
                                 }) { Text("Remove") }
                             }
                         }
-                        RacePanel("CURRENT SETUP", Vehicles.get(state.vehicleId).details, vehicleAccent(state.vehicleId))
+                        RacePanel("CURRENT SETUP", state.vehicle.details, vehicleAccent(state.vehicleId))
                         OutlinedTextField(value = state.notes, onValueChange = model::profile, label = { Text("Symptoms / additional vehicle details") }, modifier = Modifier.fillMaxWidth(), minLines = 3, enabled = editable)
                         Text("Disconnect to change vehicle details. Each connection records a snapshot of this profile. AI always uses the profile saved with the recording, even if you later select another car.")
                         Text("Optional backup", style = MaterialTheme.typography.titleLarge)

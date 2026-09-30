@@ -2,7 +2,7 @@ package com.gottdiagnostics
 
 import kotlin.math.abs
 
-data class Vehicle(val id: String, val title: String, val details: String)
+data class Vehicle(val id: String, val title: String, val details: String, val make: String = "Nissan", val paint: String = when(id) { "350z-2003" -> "WHITE"; "350z-2006" -> "RED"; "370z-2009" -> "SILVER"; else -> "PAINT NOT SET" })
 object Vehicles {
     val all = listOf(
         Vehicle("350z-2003", "2003 350Z DE", "VQ35DE; manual; 93 octane (rating standard not specified). Upgraded injectors: brand, flow rate, latency and matching calibration UNKNOWN. Aftermarket exhaust. Identify injectors and verify calibration before high-load fueling evaluation."),

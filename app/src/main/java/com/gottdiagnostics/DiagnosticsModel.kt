@@ -26,15 +26,16 @@ data class State(
     val hasApiKey: Boolean = false, val aiModel: String = AnalysisProtocol.defaultModel,
     val aiBusy: Boolean = false, val aiError: String = "", val aiPreview: String? = null,
     val question: String = "", val conversation: List<Pair<String, String>> = emptyList(), val analysisSession: String = "",
-    val samples: Int = 0, val session: String? = null
-)
+    val samples: Int = 0, val session: String? = null, val vehicles: List<Vehicle> = Vehicles.all
+) { val vehicle: Vehicle get() = vehicles.first { it.id == vehicleId } }
 class DiagnosticsModel(app: Application): AndroidViewModel(app) {
     private val prefs = app.getSharedPreferences("vehicle", 0)
     private val secrets = ApiKeyStore(app)
-    private val initialVehicle = prefs.getString("vehicle_id", Vehicles.all.first().id) ?: Vehicles.all.first().id
+    private val garage = Vehicles.all + Garage.decode(prefs.getString("custom_vehicles", "[]") ?: "[]")
+    private val initialVehicle = prefs.getString("vehicle_id", null)?.takeIf { id -> garage.any { it.id == id } } ?: garage.first().id
     private val initialNotes = prefs.getString("notes_$initialVehicle", prefs.getString("profile", "")) ?: ""
-    private val mutable = MutableStateFlow(State(vehicleId = initialVehicle, notes = initialNotes,
-        profile = Vehicles.profile(initialVehicle, initialNotes), hasApiKey = secrets.hasKey(),
+    private val mutable = MutableStateFlow(State(vehicleId = initialVehicle, notes = initialNotes, vehicles = garage,
+        profile = garage.first { it.id == initialVehicle }.profile(initialNotes), hasApiKey = secrets.hasKey(),
         aiModel = prefs.getString("ai_model", AnalysisProtocol.defaultModel) ?: AnalysisProtocol.defaultModel))
     val state = mutable.asStateFlow()
     private val connection = ObdConnection()
@@ -54,15 +55,34 @@ class DiagnosticsModel(app: Application): AndroidViewModel(app) {
     }
     fun selectVehicle(id: String) {
         if(state.value.connected || state.value.busy || state.value.aiBusy) return
+        val vehicle = state.value.vehicles.firstOrNull { it.id == id } ?: return
+        if(id == state.value.vehicleId) return
         val notes = prefs.getString("notes_$id", "") ?: ""
         prefs.edit().putString("vehicle_id", id).apply()
-        mutable.update { it.copy(vehicleId = id, notes = notes, profile = Vehicles.profile(id, notes)) }
+        log = null
+        preparedSummary = null
+        mutable.update { it.copy(vehicleId = id, notes = notes, profile = vehicle.profile(notes),
+            values = emptyMap(), codes = emptyList(), alerts = emptyList(), supported = null,
+            samples = 0, session = null, guide = null, guidance = null, aiPreview = null,
+            conversation = emptyList(), analysisSession = "", aiError = "", question = "",
+            status = "Selected ${vehicle.title} • connect to record") }
+    }
+    fun addVehicle(year: String, make: String, model: String, paint: String, details: String): String? {
+        if(state.value.connected || state.value.busy || state.value.aiBusy) return "Disconnect before adding a car."
+        return try {
+            val vehicle = Garage.create(year, make, model, paint, details)
+            val updated = state.value.vehicles + vehicle
+            check(prefs.edit().putString("custom_vehicles", Garage.encode(updated.filter { it.id.startsWith("custom-") })).commit()) { "Could not save the car. Try again." }
+            mutable.update { it.copy(vehicles = updated) }
+            selectVehicle(vehicle.id)
+            null
+        } catch(e: Exception) { e.message ?: "Could not save the car." }
     }
     fun profile(value: String) {
         if(state.value.connected || state.value.busy) return
         val notes = value.take(4000)
         prefs.edit().putString("notes_${state.value.vehicleId}", notes).apply()
-        mutable.update { it.copy(notes = notes, profile = Vehicles.profile(it.vehicleId, notes)) }
+        mutable.update { it.copy(notes = notes, profile = it.vehicle.profile(notes)) }
     }
     fun saveApiKey(value: String) {
         try {
@@ -126,7 +146,10 @@ class DiagnosticsModel(app: Application): AndroidViewModel(app) {
         aiOperation?.cancel(); aiClient.cancel()
         mutable.update { it.copy(aiBusy = false, aiError = "Stopped waiting for analysis. A submitted request may still incur API charges.") }
     }
-    private fun latestSession(): File = log ?: directory.listFiles()?.filter { it.extension == "jsonl" }?.maxByOrNull { it.lastModified() } ?: error("Connect to your vehicle and record a session first.")
+    private fun latestSession(): File = log ?: directory.listFiles()
+        ?.filter { it.extension == "jsonl" }?.sortedByDescending { it.lastModified() }
+        ?.firstOrNull { file -> runCatching { file.bufferedReader().use { sessionMatchesVehicle(it.lineSequence(), state.value.vehicle) } }.getOrDefault(false) }
+        ?: error("No recording for this car yet. Connect and record readings or scan codes first.")
     @SuppressLint("MissingPermission")
     fun refresh() {
         try {
@@ -160,6 +183,7 @@ class DiagnosticsModel(app: Application): AndroidViewModel(app) {
                     supported.addAll(block)
                 }
                 log = File(directory, "session-${System.currentTimeMillis()}.jsonl")
+                event("vehicle_id", state.value.vehicleId)
                 event("vehicle", state.value.profile)
                 event("adapter", "Bluetooth Classic ELM/STN compatible")
                 event("supported_pids", JSONArray(supported.sorted()))
