@@ -9,9 +9,28 @@ import kotlinx.coroutines.sync.withLock
 import java.io.IOException
 import java.util.UUID
 
- data class Pid(val code: String, val name: String, val unit: String)
+data class Pid(val code: String, val name: String, val unit: String)
 object Obd {
-    val pids = listOf(Pid("0C", "Engine RPM", "rpm"), Pid("0D", "Speed", "km/h"), Pid("05", "Coolant", "°C"), Pid("04", "Engine load", "%"), Pid("11", "Throttle", "%"), Pid("0F", "Intake air", "°C"), Pid("06", "Short fuel trim", "%"), Pid("07", "Long fuel trim", "%"), Pid("42", "ECU voltage", "V"))
+    val pids = listOf(
+        Pid("0C", "Engine RPM", "rpm"), Pid("0D", "Speed", "km/h"), Pid("05", "Coolant", "°C"),
+        Pid("04", "Engine load", "%"), Pid("11", "Throttle", "%"), Pid("0F", "Intake air", "°C"),
+        Pid("06", "Short fuel trim bank 1", "%"), Pid("07", "Long fuel trim bank 1", "%"),
+        Pid("08", "Short fuel trim bank 2", "%"), Pid("09", "Long fuel trim bank 2", "%"),
+        Pid("03", "Fuel system 1 status", "bitmask"), Pid("10", "Mass airflow", "g/s"),
+        Pid("0B", "Manifold absolute pressure", "kPa"), Pid("0E", "Ignition advance", "°"),
+        Pid("1F", "Engine runtime", "s"), Pid("42", "ECU voltage", "V"),
+        Pid("44", "Commanded equivalence ratio", "ratio")
+    )
+    fun supported(raw: String, base: Int): Set<String>? {
+        val rows = bytes(raw).filter { it.size >= 6 && it[0] == 0x41 && it[1] == base }
+        if (rows.isEmpty()) return null
+        return buildSet {
+            for (row in rows) {
+                val bitmap = row.drop(2).take(4).fold(0L) { acc, byte -> (acc shl 8) or byte.toLong() }
+                for (bit in 0..31) if (bitmap and (1L shl (31 - bit)) != 0L) add("%02X".format(base + bit + 1))
+            }
+        }
+    }
     fun bytes(raw: String): List<List<Int>> {
         val result = mutableListOf<List<Int>>()
         var assembled: MutableList<Int>? = null
@@ -43,8 +62,12 @@ object Obd {
             "42" -> data.getOrNull(1)?.let { (a * 256 + it) / 1000 }
             "05", "0F" -> a - 40
             "04", "11" -> a * 100 / 255
-            "06", "07" -> (a - 128) * 100 / 128
-            "0D" -> a
+            "06", "07", "08", "09" -> (a - 128) * 100 / 128
+            "0D", "0B", "03" -> a
+            "0E" -> a / 2 - 64
+            "10" -> data.getOrNull(1)?.let { (a * 256 + it) / 100 }
+            "1F" -> data.getOrNull(1)?.let { a * 256 + it }
+            "44" -> data.getOrNull(1)?.let { (a * 256 + it) * 2 / 65536 }
             else -> null
         }
     }
@@ -62,7 +85,7 @@ object Obd {
     fun anomalies(values: Map<String, Double>): List<String> = buildList {
         values["05"]?.let { if(it > 110) add("High coolant temperature: %.1f °C".format(it)) }
         values["42"]?.let { if(it < 11.8) add("Low ECU voltage: %.2f V".format(it)); if(it > 15.2) add("High ECU voltage: %.2f V".format(it)) }
-        for (pid in listOf("06", "07")) values[pid]?.let { if(kotlin.math.abs(it) > 20) add("${if(pid == "06") "Short" else "Long"} fuel trim exceeds ±20%%: %.1f%%".format(it)) }
+        for (pid in listOf("06", "07", "08", "09")) values[pid]?.let { if(kotlin.math.abs(it) > 20) add("${pids.first { it.code == pid }.name} exceeds ±20%%: %.1f%%".format(it)) }
     }
 }
 

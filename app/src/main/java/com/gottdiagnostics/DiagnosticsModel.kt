@@ -21,21 +21,112 @@ data class State(
     val devices: List<Adapter> = emptyList(), val connected: Boolean = false, val busy: Boolean = false,
     val monitoring: Boolean = false, val values: Map<String, Double> = emptyMap(),
     val codes: List<String> = emptyList(), val alerts: List<String> = emptyList(),
-    val profile: String = "", val samples: Int = 0, val session: String? = null
+    val profile: String = "", val vehicleId: String = Vehicles.all.first().id, val notes: String = "",
+    val supported: Set<String>? = null, val guide: Guide? = null, val guidance: GuideProgress? = null,
+    val hasApiKey: Boolean = false, val aiModel: String = AnalysisProtocol.defaultModel,
+    val aiBusy: Boolean = false, val aiError: String = "", val aiPreview: String? = null,
+    val question: String = "", val conversation: List<Pair<String, String>> = emptyList(), val analysisSession: String = "",
+    val samples: Int = 0, val session: String? = null
 )
 class DiagnosticsModel(app: Application): AndroidViewModel(app) {
     private val prefs = app.getSharedPreferences("vehicle", 0)
-    private val mutable = MutableStateFlow(State(profile = prefs.getString("profile", "") ?: ""))
+    private val secrets = ApiKeyStore(app)
+    private val initialVehicle = prefs.getString("vehicle_id", Vehicles.all.first().id) ?: Vehicles.all.first().id
+    private val initialNotes = prefs.getString("notes_$initialVehicle", prefs.getString("profile", "")) ?: ""
+    private val mutable = MutableStateFlow(State(vehicleId = initialVehicle, notes = initialNotes,
+        profile = Vehicles.profile(initialVehicle, initialNotes), hasApiKey = secrets.hasKey(),
+        aiModel = prefs.getString("ai_model", AnalysisProtocol.defaultModel) ?: AnalysisProtocol.defaultModel))
     val state = mutable.asStateFlow()
     private val connection = ObdConnection()
     private var operation: Job? = null
+    private var guideDeadline: Job? = null
+    private var aiOperation: Job? = null
+    private val aiClient = OpenAiClient()
+    private var preparedSummary: JSONObject? = null
+    private var preparedHistory: List<Pair<String, String>> = emptyList()
+    private var preparedQuestion = ""
+    private var preparedModel = ""
     private var log: File? = null
     private val logLock = Any()
     private val directory = File(app.filesDir, "sessions").apply { mkdirs() }
-    private fun event(type: String, data: Any) {
-        synchronized(logLock) { log?.appendText(JSONObject().put("time", java.time.Instant.now().toString()).put("type", type).put("data", data).toString() + "\n") }
+    private fun event(type: String, data: Any, guide: Guide? = null, qualifying: Boolean = false) {
+        synchronized(logLock) { log?.appendText(JSONObject().put("time", java.time.Instant.now().toString()).put("type", type).put("data", data).put("guide", guide?.name ?: JSONObject.NULL).put("qualifying", qualifying).toString() + "\n") }
     }
-    fun profile(value: String) { prefs.edit().putString("profile", value).apply(); mutable.update { it.copy(profile = value) } }
+    fun selectVehicle(id: String) {
+        if(state.value.connected || state.value.busy || state.value.aiBusy) return
+        val notes = prefs.getString("notes_$id", "") ?: ""
+        prefs.edit().putString("vehicle_id", id).apply()
+        mutable.update { it.copy(vehicleId = id, notes = notes, profile = Vehicles.profile(id, notes)) }
+    }
+    fun profile(value: String) {
+        if(state.value.connected || state.value.busy) return
+        val notes = value.take(4000)
+        prefs.edit().putString("notes_${state.value.vehicleId}", notes).apply()
+        mutable.update { it.copy(notes = notes, profile = Vehicles.profile(it.vehicleId, notes)) }
+    }
+    fun saveApiKey(value: String) {
+        try {
+            val key = value.trim()
+            require(key.startsWith("sk-") && key.length >= 20 && key.none { it.isWhitespace() }) { "Enter an OpenAI API key, not a ChatGPT password." }
+            secrets.save(key)
+            mutable.update { it.copy(hasApiKey = true, aiError = "API key saved encrypted on this phone. It has not yet been checked with OpenAI.") }
+        } catch(e: IllegalArgumentException) { mutable.update { it.copy(aiError = e.message ?: "Invalid key") } }
+        catch(_: Exception) { mutable.update { it.copy(aiError = "Unable to encrypt the API key on this device. It was not saved.") } }
+    }
+    fun removeApiKey() {
+        if(state.value.aiBusy) return
+        try { secrets.clear(); mutable.update { it.copy(hasApiKey = false, aiError = "API key removed.") } }
+        catch(_: Exception) { mutable.update { it.copy(aiError = "Could not remove key. Clear app storage in Android settings to remove local data.") } }
+    }
+    fun aiModel(value: String) {
+        if(state.value.aiBusy) return
+        val model = value.take(100).trim()
+        prefs.edit().putString("ai_model", model).apply(); mutable.update { it.copy(aiModel = model) }
+    }
+    fun question(value: String) { mutable.update { it.copy(question = value.take(2000)) } }
+    fun dismissPreview() { preparedSummary = null; mutable.update { it.copy(aiPreview = null) } }
+    fun prepareAnalysis() {
+        if(state.value.busy || state.value.aiBusy) return
+        mutable.update { it.copy(aiBusy = true, aiError = "") }
+        aiOperation = viewModelScope.launch(Dispatchers.IO) {
+            try {
+                check(secrets.hasKey()) { "Add your OpenAI API key below first." }
+                check(state.value.aiModel.matches(Regex("[A-Za-z0-9._:-]+"))) { "Enter a valid API model name." }
+                val source = latestSession()
+                val summary = synchronized(logLock) { source.bufferedReader().use { SessionSummary.create(it.lineSequence(), source.name) } }
+                check(summary.getInt("sample_count") > 0 || summary.getJSONArray("dtc_scans_last_10").length() > 0) { "Record readings or scan DTCs before analysis." }
+                preparedSummary = summary; preparedQuestion = state.value.question; preparedModel = state.value.aiModel
+                preparedHistory = if(state.value.analysisSession == source.name) state.value.conversation else emptyList()
+                val body = AnalysisProtocol.request(preparedModel, summary, preparedQuestion, preparedHistory)
+                mutable.update { it.copy(aiBusy = false, aiPreview = body.toString(2)) }
+            } catch(e: CancellationException) { throw e } catch(e: Exception) {
+                mutable.update { it.copy(aiBusy = false, aiError = e.message ?: "Could not prepare session.") }
+            }
+        }
+    }
+    fun sendAnalysis() {
+        val summary = preparedSummary ?: return
+        if(state.value.aiBusy) return
+        val history = preparedHistory; val question = preparedQuestion; val model = preparedModel
+        preparedSummary = null
+        mutable.update { it.copy(aiBusy = true, aiPreview = null, aiError = "", analysisSession = summary.getString("session"), conversation = history) }
+        aiOperation = viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val key = try { secrets.read() } catch(_: Exception) { error("Cannot unlock saved API key. Remove it and enter it again.") }
+                val answer = aiClient.analyze(key, AnalysisProtocol.request(model, summary, question, history))
+                ensureActive()
+                mutable.update { it.copy(aiBusy = false, conversation = (history + (question to answer)).takeLast(6), question = "") }
+            } catch(e: CancellationException) { throw e }
+            catch(e: java.net.SocketTimeoutException) { if(isActive) mutable.update { it.copy(aiBusy = false, aiError = "OpenAI request timed out. No automatic retry was made; it may still have incurred an API charge.") } }
+            catch(e: java.io.IOException) { if(isActive) mutable.update { it.copy(aiBusy = false, aiError = "Cannot reach OpenAI. Check your internet connection. No automatic retry was made.") } }
+            catch(e: Exception) { if(isActive) mutable.update { it.copy(aiBusy = false, aiError = e.message ?: "Analysis failed.") } }
+        }
+    }
+    fun cancelAnalysis() {
+        aiOperation?.cancel(); aiClient.cancel()
+        mutable.update { it.copy(aiBusy = false, aiError = "Stopped waiting for analysis. A submitted request may still incur API charges.") }
+    }
+    private fun latestSession(): File = log ?: directory.listFiles()?.filter { it.extension == "jsonl" }?.maxByOrNull { it.lastModified() } ?: error("Connect to your vehicle and record a session first.")
     @SuppressLint("MissingPermission")
     fun refresh() {
         try {
@@ -45,7 +136,8 @@ class DiagnosticsModel(app: Application): AndroidViewModel(app) {
         } catch(e: SecurityException) { mutable.update { it.copy(status = "Bluetooth permission is required. Tap Grant Bluetooth permission.") } }
     }
     fun connect(address: String) {
-        if(state.value.busy || state.value.connected) return
+        if(state.value.busy || state.value.connected || state.value.aiBusy) return
+        log = null
         mutable.update { it.copy(busy = true, status = "Connecting…") }
         operation = viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -61,44 +153,77 @@ class DiagnosticsModel(app: Application): AndroidViewModel(app) {
                 }
                 val probe = connection.command("0100", 15000)
                 check(Obd.bytes(probe).any { it.take(2) == listOf(0x41, 0) }) { "No ECU response. Turn ignition on and reconnect. $probe" }
+                val supported = Obd.supported(probe, 0)?.toMutableSet() ?: error("Invalid supported-PID response")
+                for(base in listOf(0x20, 0x40)) {
+                    if ("%02X".format(base) !in supported) break
+                    val block = Obd.supported(connection.command("01%02X".format(base)), base) ?: break
+                    supported.addAll(block)
+                }
                 log = File(directory, "session-${System.currentTimeMillis()}.jsonl")
                 event("vehicle", state.value.profile)
                 event("adapter", "Bluetooth Classic ELM/STN compatible")
-                mutable.update { it.copy(connected = true, busy = false, status = "Connected • ECU responding", session = log?.name, samples = 0, values = emptyMap(), codes = emptyList(), alerts = emptyList()) }
+                event("supported_pids", JSONArray(supported.sorted()))
+                mutable.update { it.copy(connected = true, busy = false, status = "Connected • ECU responding", session = log?.name, samples = 0, values = emptyMap(), codes = emptyList(), alerts = emptyList(), supported = supported, guide = null, guidance = null, aiPreview = null) }
             } catch(e: CancellationException) { throw e } catch(e: Exception) { ensureActive(); failure(e) }
         }
     }
     private fun failure(e: Exception) {
+        guideDeadline?.cancel()
         connection.close()
-        mutable.update { it.copy(connected = false, busy = false, monitoring = false, status = e.message ?: "Connection failed") }
+        runCatching { event("connection_error", e.message ?: "Connection lost") }
+        mutable.update { it.copy(connected = false, busy = false, monitoring = false, guidance = if(it.monitoring && it.guide != null) GuideProgress("Connection error; guided recording incomplete.", terminal = true) else it.guidance, status = e.message ?: "Connection failed") }
     }
-    fun monitor() {
-        if(!state.value.connected || state.value.busy || state.value.monitoring) return
-        mutable.update { it.copy(monitoring = true, busy = true, status = "Live monitoring • keep app open") }
+    fun monitor(guide: Guide? = null) {
+        if(!state.value.connected || state.value.busy || state.value.monitoring || state.value.aiBusy) return
+        val missing = guide?.required?.minus(state.value.supported ?: emptySet()) ?: emptySet()
+        if(missing.isNotEmpty()) {
+            mutable.update { it.copy(guide = guide, guidance = GuideProgress("This ECU does not advertise required PIDs: ${missing.joinToString()}. Choose a different test or diagnostic tool.", terminal = true), status = "Guided recording unavailable") }; return
+        }
+        val started = android.os.SystemClock.elapsedRealtime()
+        val tracker = guide?.let { GuideTracker(it, started) }
+        mutable.update { it.copy(monitoring = true, busy = true, guide = guide, guidance = guide?.let { GuideProgress("Recording started. Follow the instructions; do not exceed the stated hold time.") }, status = "Recording • keep app open") }
+        guideDeadline?.cancel()
+        if(guide != null) guideDeadline = viewModelScope.launch {
+            delay(guide.maxSeconds * 1000L)
+            if(state.value.monitoring) mutable.update { it.copy(monitoring = false, guidance = GuideProgress("Time limit reached. ${if(guide == Guide.NEUTRAL) "Release the accelerator now." else "Review after parking."} Recording may be insufficient; do not extend the test.", terminal = true), status = "Test time limit reached • finishing current reading") }
+        }
         operation = viewModelScope.launch(Dispatchers.IO) {
             try {
+                if(guide != null) event("guide_start", JSONObject().put("guide", guide.name).put("instructions", guide.instructions))
+                val available = Obd.pids.filter { state.value.supported?.contains(it.code) != false }
+                val selected = if(guide == Guide.NEUTRAL) available.filter { it.code in guide.required || it.code in setOf("03", "06", "07", "08", "09") } else available
+                val ordered = selected.sortedBy { if(it.code in (guide?.required ?: emptySet())) 0 else 1 }
+                check(ordered.isNotEmpty()) { "No supported live PIDs available." }
                 while(isActive && state.value.monitoring) {
                     val values = mutableMapOf<String, Double>()
-                    for(pid in Obd.pids) {
+                    for(pid in ordered) {
                         if (!state.value.monitoring) break
                         val raw = connection.command("01${pid.code}")
                         event("raw", JSONObject().put("command", "01${pid.code}").put("response", raw))
                         Obd.value(pid.code, raw)?.let { values[pid.code] = it }
                     }
                     val alerts = Obd.anomalies(values)
-                    event("sample", JSONObject(values.toMap())); if(alerts.isNotEmpty()) event("anomalies", JSONArray(alerts))
-                    mutable.update { it.copy(values = values.toMap(), alerts = alerts, samples = it.samples + 1) }
-                    if (state.value.monitoring) delay(500)
+                    val progress = if(state.value.monitoring) tracker?.accept(values, android.os.SystemClock.elapsedRealtime()) else state.value.guidance
+                    event("sample", JSONObject(values.toMap()), guide, progress?.qualifying == true)
+                    if(alerts.isNotEmpty()) event("anomalies", JSONArray(alerts))
+                    mutable.update { it.copy(values = values.toMap(), alerts = alerts, samples = it.samples + 1, guidance = progress, monitoring = it.monitoring && progress?.terminal != true) }
+                    if (state.value.monitoring) delay(250)
                 }
-                mutable.update { it.copy(busy = false, monitoring = false, status = "Monitoring stopped • ready to scan or export") }
-            } catch(e: CancellationException) { throw e } catch(e: Exception) { ensureActive(); failure(e) }
+                if(guide != null) event("guide_end", JSONObject().put("guide", guide.name).put("complete", state.value.guidance?.complete == true).put("result", state.value.guidance?.text ?: "Stopped manually"))
+                mutable.update { it.copy(busy = false, monitoring = false, status = "Recording saved • ready to scan or analyze") }
+            } catch(e: CancellationException) {
+                if(guide != null) runCatching { event("guide_end", JSONObject().put("guide", guide.name).put("complete", false).put("result", "Disconnected or canceled")) }
+                throw e
+            } catch(e: Exception) { ensureActive(); failure(e) }
+            finally { guideDeadline?.cancel() }
         }
     }
     fun stopMonitoring() {
-        mutable.update { it.copy(monitoring = false, status = "Finishing current PID…") }
+        guideDeadline?.cancel()
+        mutable.update { it.copy(monitoring = false, guidance = it.guide?.let { _ -> GuideProgress("Stopped by owner; data may be incomplete.", terminal = true) }, status = "Finishing current PID…") }
     }
     fun scan() {
-        if(!state.value.connected || state.value.busy) return
+        if(!state.value.connected || state.value.busy || state.value.aiBusy) return
         mutable.update { it.copy(busy = true, status = "Scanning stored and pending DTCs…") }
         operation = viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -115,9 +240,10 @@ class DiagnosticsModel(app: Application): AndroidViewModel(app) {
         }
     }
     fun disconnect() {
+        guideDeadline?.cancel()
         val running = operation
         connection.close(); running?.cancel()
-        mutable.update { it.copy(connected = false, busy = true, monitoring = false, status = "Closing session…") }
+        mutable.update { it.copy(connected = false, busy = true, monitoring = false, guidance = if(it.monitoring && it.guide != null) GuideProgress("Disconnected; guided recording incomplete.", terminal = true) else it.guidance, status = "Closing session…") }
         viewModelScope.launch {
             running?.join(); operation = null
             mutable.update { it.copy(connected = false, busy = false, monitoring = false, status = "Disconnected • session saved") }
@@ -125,7 +251,7 @@ class DiagnosticsModel(app: Application): AndroidViewModel(app) {
     }
     suspend fun export(): File = withContext(Dispatchers.IO) {
         check(!state.value.busy) { "Disconnect before exporting to finish the session." }
-        val source = log ?: directory.listFiles()?.filter { it.extension == "jsonl" }?.maxByOrNull { it.lastModified() } ?: error("Connect to your vehicle to create a session first.")
+        val source = latestSession()
         val out = File(getApplication<Application>().filesDir, "exports").apply { mkdirs() }
         val zip = File(out, source.nameWithoutExtension + "-export-${System.currentTimeMillis()}.zip")
         ZipOutputStream(zip.outputStream()).use { stream ->
@@ -135,5 +261,5 @@ class DiagnosticsModel(app: Application): AndroidViewModel(app) {
         }
         zip
     }
-    override fun onCleared() { connection.close(); super.onCleared() }
+    override fun onCleared() { aiClient.cancel(); connection.close(); super.onCleared() }
 }

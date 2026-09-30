@@ -22,6 +22,17 @@ class ObdTest {
         assertEquals(listOf("P0133", "P0300"), Obd.dtcs("43 02 01 33 03 00", 0x43))
         assertEquals(listOf("P0133", "P0300", "P0420", "P0171"), Obd.dtcs("00A\r0: 43 04 01 33 03 00\r1: 04 20 01 71\r>", 0x43))
     }
+    @Test fun discoversPidBitmaps() {
+        assertEquals(setOf("01", "20"), Obd.supported("41 00 80 00 00 01", 0))
+        assertEquals(setOf("42", "44"), Obd.supported("41 40 50 00 00 00", 0x40))
+        assertNull(Obd.supported("NO DATA", 0))
+    }
+    @Test fun decodesAdditionalVqReadings() {
+        assertEquals(10.0, Obd.value("10", "41 10 03 E8")!!, 0.01)
+        assertEquals(16.0, Obd.value("0E", "41 0E A0")!!, 0.01)
+        assertEquals(-25.0, Obd.value("08", "41 08 60")!!, 0.01)
+        assertEquals(1.0, Obd.value("44", "41 44 80 00")!!, 0.01)
+    }
     @Test fun flagsThresholdsOnlyWhenDataExists() {
         assertTrue(Obd.anomalies(emptyMap()).isEmpty())
         assertEquals(3, Obd.anomalies(mapOf("05" to 115.0, "42" to 10.0, "07" to -30.0)).size)
