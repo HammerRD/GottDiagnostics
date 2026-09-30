@@ -1,0 +1,35 @@
+name: Build and publish debug APK
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Build and validate
+        run: ./gradlew --no-daemon assembleDebug testDebugUnitTest lintDebug
+      - name: Prepare APK and checksum
+        run: |
+          mkdir -p release-assets
+          cp app/build/outputs/apk/debug/app-debug.apk release-assets/gott-diagnostics-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose release-assets/gott-diagnostics-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c 4 release-assets/gott-diagnostics-debug.apk
+          cd release-assets
+          sha256sum gott-diagnostics-debug.apk > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gott-diagnostics-debug
+          path: release-assets/
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release upload v1.0.0-debug release-assets/gott-diagnostics-debug.apk release-assets/SHA256SUMS.txt
+          gh release edit v1.0.0-debug --draft=false --prerelease
