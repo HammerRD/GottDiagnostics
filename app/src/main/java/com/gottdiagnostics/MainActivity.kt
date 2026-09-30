@@ -57,7 +57,7 @@ class MainActivity: ComponentActivity() {
             Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Column(Modifier.weight(1f)) {
                     Text(state.status, style = MaterialTheme.typography.bodySmall, color = RaceMuted)
-                    if(state.session != null) RaceEyebrow("${state.samples} SAMPLES / LOCAL SESSION", RaceCyan)
+                    if(state.session != null) RaceEyebrow("${state.samples} SAMPLES / LOCAL SESSION", RaceWhite)
                 }
                 if(state.monitoring) FilledTonalButton(onClick = model::stopMonitoring, colors = ButtonDefaults.filledTonalButtonColors(containerColor = RaceRed, contentColor = Color(0xFF1B0B0B))) { Text("STOP") }
             }
@@ -87,14 +87,14 @@ class MainActivity: ComponentActivity() {
                         Text("Neutral RPM is not a substitute for road load. These are conservative collection guides, not Nissan factory test procedures.", color = RaceMuted)
                         Guide.entries.forEach { item -> GuideOption(item, guide == item, !state.busy) { guide = item } }
                         Text(guide.title, style = MaterialTheme.typography.titleLarge)
-                        RacePanel("01 / SET UP", guide.instructions, RaceLime)
+                        RacePanel("01 / SET UP", guide.instructions, RaceAccent)
                         RacePanel("02 / WHAT YOU WILL LEARN", guide.purpose)
                         RacePanel("STOP CONDITIONS", guide.abort, RaceRed)
                         Text("Required channels: " + guide.required.joinToString { code -> Obd.pids.first { it.code == code }.name }, style = MaterialTheme.typography.bodySmall, color = RaceMuted)
                         Row { Checkbox(checked = ready, onCheckedChange = { ready = it }, enabled = !state.busy); Text("I am parked, have read the steps and stop conditions, and will not handle the phone while driving.", Modifier.padding(top = 8.dp)) }
                         Button(onClick = { model.monitor(guide); ready = false }, enabled = ready && state.connected && !state.busy && !state.aiBusy, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("START GUIDED RECORDING") }
                         state.guidance?.let { progress ->
-                            RacePanel(if(progress.complete) "CAPTURE COMPLETE" else "SESSION PROGRESS", "${state.guide?.title ?: "Recording"}\n${progress.text}\nApproximate qualifying coverage: ${progress.seconds} s • ${progress.samples} readings", if(progress.complete) RaceLime else RaceCyan)
+                            RacePanel(if(progress.complete) "CAPTURE COMPLETE" else "SESSION PROGRESS", "${state.guide?.title ?: "Recording"}\n${progress.text}\nApproximate qualifying coverage: ${progress.seconds} s • ${progress.samples} readings", if(progress.complete) RaceAccent else RaceWhite)
                         }
                         if(state.vehicleId == "350z-2003") Text("2003 DE: unknown injectors and calibration. Identify them and verify matching calibration before high-load fueling evaluation.", color = MaterialTheme.colorScheme.error)
                         Text("High-load / dyno testing", style = MaterialTheme.typography.titleMedium)
@@ -111,7 +111,7 @@ class MainActivity: ComponentActivity() {
                             }
                         }
                         Text("Keep the app open. Values are sequential samples. — means unavailable; after stopping, the display retains the last reading.", style = MaterialTheme.typography.bodySmall, color = RaceMuted)
-                        RaceEyebrow("ENGINE CHANNELS", RaceCyan)
+                        RaceEyebrow("ENGINE CHANNELS", RaceWhite)
                         Surface(shape = RoundedCornerShape(14.dp), color = RacePanel, border = BorderStroke(1.dp, RaceLine)) {
                             Column(Modifier.padding(horizontal = 14.dp)) {
                                 Obd.pids.filter { it.code !in headlinePids && it.code != "0C" }.forEach { pid ->
@@ -124,7 +124,7 @@ class MainActivity: ComponentActivity() {
                             }
                         }
                         Text("Fuel-system status: 1 cold/open loop, 2 closed loop, 4 load/decel open loop, 8 fault open loop, 16 closed loop with fault. Commanded equivalence ratio is not measured AFR.", style = MaterialTheme.typography.bodySmall, color = RaceMuted)
-                        RaceEyebrow("THRESHOLD WATCH", RaceOrange)
+                        RaceEyebrow("THRESHOLD WATCH", RaceSilver)
                         Text("Heuristic thresholds; consider engine state, closed-loop status and vehicle specifications.")
                         if(state.alerts.isEmpty()) Text(if(state.samples == 0) "Start recording to evaluate readings." else "No threshold alerts in the latest sample.")
                         state.alerts.forEach { RacePanel("CHECK THIS READING", it, RaceRed) }
@@ -133,7 +133,7 @@ class MainActivity: ComponentActivity() {
                         RaceHeading("04 / FAULT MEMORY", "Decode the warning.", "Stored and pending powertrain trouble codes.")
                         RacePanel("BEFORE YOU SCAN", "Stop recording first. Trouble codes and recorded readings stay in the same session for AI analysis.")
                         Button(onClick = model::scan, enabled = state.connected && !state.busy && !state.aiBusy, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("SCAN TROUBLE CODES") }
-                        state.codes.forEach { code -> RacePanel("ECU REPORTED", code, RaceOrange) }
+                        state.codes.forEach { code -> RacePanel("ECU REPORTED", code, RaceSilver) }
                         if(state.codes.isEmpty()) RacePanel("NO CODES DISPLAYED", "Use Scan to read the ECU. An empty list before a scan does not establish a healthy vehicle.", RaceMuted)
                         Text("A DTC identifies a detected condition, not necessarily a failed part. No codes are cleared.")
                         Text("Service, relearns & performance tuning", style = MaterialTheme.typography.titleLarge)
@@ -160,20 +160,20 @@ class MainActivity: ComponentActivity() {
                     }
                     5 -> {
                         RaceHeading("06 / AI ANALYSIS", "Your second opinion.", "Turn a session into your next diagnostic step.")
-                        RaceBadge(if(state.hasApiKey) "PERSONAL API / KEY SAVED" else "PERSONAL API / SETUP NEEDED", RaceCyan)
+                        RaceBadge(if(state.hasApiKey) "PERSONAL API / KEY SAVED" else "PERSONAL API / SETUP NEEDED", RaceWhite)
                         RacePanel("YOU STAY IN CONTROL", "Park and stop recording before analysis. Data goes directly to OpenAI only after your confirmation. API charges are separate from ChatGPT subscriptions. AI advice cannot change ECU settings.")
                         OutlinedTextField(value = state.question, onValueChange = model::question, label = { Text("Question or follow-up (optional)") }, minLines = 2, modifier = Modifier.fillMaxWidth(), enabled = !state.aiBusy)
                         Button(onClick = model::prepareAnalysis, enabled = !state.busy && !state.aiBusy && state.hasApiKey, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("REVIEW DATA & ANALYZE") }
                         if(state.aiBusy) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Preparing / requesting analysis…"); OutlinedButton(onClick = model::cancelAnalysis) { Text("Cancel") } }
                         if(state.aiError.isNotEmpty()) Text(state.aiError)
                         if(state.analysisSession.isNotEmpty()) Text("Analysis of: ${state.analysisSession}", style = MaterialTheme.typography.bodySmall)
-                        state.conversation.forEachIndexed { index, (question, answer) -> Surface(Modifier.fillMaxWidth(), color = RacePanel, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, RaceCyan.copy(alpha = 0.35f))) { Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            RaceEyebrow("ANALYSIS / ${index + 1}", RaceCyan)
+                        state.conversation.forEachIndexed { index, (question, answer) -> Surface(Modifier.fillMaxWidth(), color = RacePanel, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, RaceWhite.copy(alpha = 0.35f))) { Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            RaceEyebrow("ANALYSIS / ${index + 1}", RaceWhite)
                             Text(if(question.isBlank()) "Diagnostic assessment" else question, style = MaterialTheme.typography.titleMedium)
                             SelectionContainer { Text(answer) }
                         } } }
                         HorizontalDivider(color = RaceLine)
-                        RaceEyebrow("PERSONAL API / SETTINGS", RaceCyan)
+                        RaceEyebrow("PERSONAL API / SETTINGS", RaceWhite)
                         Text(if(state.hasApiKey) "A key is saved, encrypted using Android Keystore. It is excluded from logs, exports and backups." else "Enter your OpenAI API key on this phone. Do not send it in chat. Enable API billing and set a spending limit in your OpenAI account.")
                         OutlinedTextField(value = apiKey, onValueChange = { apiKey = it }, label = { Text("OpenAI API key") }, visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.aiBusy)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

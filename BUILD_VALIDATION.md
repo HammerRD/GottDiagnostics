@@ -1,4 +1,4 @@
-# Version 1.2 cloud validation
+# Version 1.3 cloud validation
 
 Validated 2026-09-30 using `./scripts/build-cloud.sh --rerun-tasks`.
 
@@ -7,7 +7,7 @@ Validated 2026-09-30 using `./scripts/build-cloud.sh --rerun-tasks`.
 - `lintDebug`: no issues found.
 - APK signature and zip alignment: verified.
 - Local APK size: 8,847,588 bytes.
-- Local APK SHA-256: `5955ed3666ea9a54d034b88f2987c0e028bdbdcac070eb48e853b23314cbab7e`.
+- Local APK SHA-256: `11025a635a5fe16d2cb071211ad84675a4bd4eb6a21f58f747f5a9f5aad72286`.
 - JDK 17.0.16, Gradle 8.9, AGP 8.7.3, Kotlin 2.0.21, SDK/build tools 35.
 
 Two additional local UI checks used a temporary Robolectric 4.14.1 native-graphics/Compose harness on Android API 34, at 393×852 and 320×640 dp. Navigation to all six destinations was verified at standard size; the narrow check verified bottom navigation and the offline cockpit. Actual Android view drawing was captured and inspected. The AI screen's screenshot protection was retained; its heading/navigation was checked without capturing it. These host-only checks and dependencies are not part of the shipped app or standard CI. Captures are in docs/screenshots.
