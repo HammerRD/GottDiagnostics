@@ -1,10 +1,22 @@
-# Gott Diagnostics 1.1
+# Gott Diagnostics 1.2
 
 Native Kotlin / Jetpack Compose Android app for an OBDLink MX+ using Bluetooth Classic SPP. Android 8.0+ (API 26). Includes guided OBD recording and direct, owner-approved OpenAI analysis inside the app.
 
 ## Install
 
-Download `gott-diagnostics-debug.apk` from the GitHub release assets and open it on your phone. Allow installation from the file-opening app. These are development builds, not production-signed releases. The GitHub runner generates a debug signing key for each build, so Android may reject an in-place update. If version 1.0 is installed, export any logs you want to keep before uninstalling it and installing 1.1. Uninstalling clears app data. The API key must be entered again after reinstalling. The release's SHA256SUMS.txt identifies the downloadable APK; a local build has a different signing key/checksum.
+Download `gott-diagnostics-debug.apk` from the GitHub release assets and open it on your phone. Allow installation from the file-opening app. These are development builds, not production-signed releases. The GitHub runner generates a debug signing key for each build, so Android may reject an in-place update. If an earlier version is installed, export any logs you want to keep before uninstalling it and installing 1.2. Uninstalling clears app data. The API key must be entered again after reinstalling. The release's SHA256SUMS.txt identifies the downloadable APK; a local build has a different signing key/checksum.
+
+## Motorsport interface
+
+Version 1.2 adds a charcoal, acid-lime and cyan design with condensed headings, stylized coupe artwork, distinct garage cards, a segmented RPM display and a two-column live telemetry dashboard. All six destinations remain visible in the bottom navigation: Link, Guides, Live, Codes, Garage and AI. Scroll position resets when switching sections, and the Stop recording button stays above the content while recording.
+
+The RPM display is a visual scale, not an ECU redline or a recommended target. Offline/missing readings show dashes and NO DATA; stopped readings are labeled LAST READING. Vehicle illustrations are stylized, not representations of the owner's exact body modifications. The engine protocols, guide conditions, privacy controls and API behavior are unchanged.
+
+Phone-size captures from the actual Compose UI, rendered locally in Android's host test runtime (offline, no simulated vehicle readings):
+
+| Paddock | Live cockpit | Garage |
+|---|---|---|
+| ![Paddock](docs/screenshots/paddock.png) | ![Live cockpit](docs/screenshots/cockpit.png) | ![Garage](docs/screenshots/garage.png) |
 
 ## Your garage
 
@@ -14,14 +26,14 @@ Choose a vehicle before connecting; all are manual transmission and run owner-re
 - 2006 350Z VQ35DE Rev-Up: Kinetix intake manifold, full exhaust, high-flow catalytic converters; tune unknown.
 - 2009 370Z VQ37VHR: cold-air intake, full exhaust with test pipes; UpRev tune believed to match the modifications but not confirmed.
 
-Add symptoms or corrections under Vehicle. Each connection saves a profile snapshot. Analysis uses the profile in the recording, not whichever car you later select.
+Add symptoms or corrections under Garage. Each connection saves a profile snapshot. Analysis uses the profile in the recording, not whichever car you later select.
 
 ## Record and analyze
 
 1. Plug in and pair the MX+ in Android Bluetooth settings. Close other OBD apps. Select the vehicle, turn ignition on, grant Nearby devices permission, and connect.
 2. Under **Guides**, read the conditions, purpose and stop instructions, acknowledge readiness while parked, and start a recording. Or record freely under **Live**.
 3. Stop recording, then scan stored and pending DTCs under **Codes** to include both in the same session. Nothing clears codes or sends ECU write commands.
-4. Park, open **AI analysis**, enter your own OpenAI API key and save it. API billing is separate from ChatGPT subscriptions; configure spending limits in your API account. The editable default model is `gpt-5.4-mini`; access depends on your project.
+4. Park, open **AI**, enter your own OpenAI API key and save it. API billing is separate from ChatGPT subscriptions; configure spending limits in your API account. The editable default model is `gpt-5.4-mini`; access depends on your project.
 5. Enter a question, tap **Review data & analyze**, inspect the exact request body, and confirm **Send & analyze**. Read the answer and ask follow-ups inside the app. No ZIP or external prompt is required. ZIP export remains an optional backup.
 
 Without an API key the app still records, scans, guides and exports. No account login, developer-owned backend, or embedded API key is used.
