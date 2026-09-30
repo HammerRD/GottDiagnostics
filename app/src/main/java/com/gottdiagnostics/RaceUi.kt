@@ -135,9 +135,9 @@ private val Condensed = FontFamily(Typeface.create("sans-serif-condensed", Typef
     }
 }
 
-internal fun vehicleAccent(id: String) = when(id) { "350z-2006" -> RaceWhite; "370z-2009" -> RaceSilver; else -> RaceAccent }
+internal fun vehicleAccent(id: String) = when(id) { "350z-2006" -> RaceAccent; "370z-2009" -> RaceSilver; else -> RaceWhite }
 
-@Composable internal fun VehicleHero(vehicle: Vehicle, selected: Boolean = true, compact: Boolean = false, onClick: (() -> Unit)? = null, enabled: Boolean = true) {
+@Composable internal fun VehicleHero(vehicle: Vehicle, selected: Boolean = true, compact: Boolean = false, onClick: (() -> Unit)? = null, enabled: Boolean = true, photoUri: String? = null) {
     val accent = vehicleAccent(vehicle.id)
     val click = if(onClick != null) Modifier.clickable(enabled = enabled, role = Role.RadioButton, onClick = onClick).semantics { this.selected = selected } else Modifier
     Surface(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).then(click),
@@ -153,42 +153,16 @@ internal fun vehicleAccent(id: String) = when(id) { "350z-2006" -> RaceWhite; "3
                         Text(vehicle.title.removePrefix(vehicle.title.take(5)), style = MaterialTheme.typography.headlineLarge.copy(fontSize = if(compact) 30.sp else 40.sp))
                         RaceEyebrow(when(vehicle.id) { "350z-2006" -> "VQ35DE REV-UP"; "370z-2009" -> "VQ37VHR / UPREV"; else -> "VQ35DE / MODIFIED" }, RaceMuted)
                     }
-                    if(compact) CoupeArt(accent, Modifier.width(104.dp).height(54.dp))
+
                 }
+                VehiclePhoto(vehicle, photoUri, Modifier.fillMaxWidth().height(if(compact) 150.dp else 190.dp).clip(RoundedCornerShape(10.dp)))
                 if(!compact) {
-                    CoupeArt(accent, Modifier.fillMaxWidth().height(92.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         RaceEyebrow("${vehicle.title.take(4)} MODEL", RaceMuted)
                         RaceEyebrow("REAR-WHEEL DRIVE", RaceMuted)
                     }
                 }
             }
-        }
-    }
-}
-
-/** Stylized coupe illustration, not a photograph or a claim about a car's body modifications. */
-@Composable private fun CoupeArt(accent: Color, modifier: Modifier) {
-    Canvas(modifier) {
-        val x = size.width / 320f; val y = size.height / 100f
-        for(i in 0..5) drawLine(accent.copy(alpha=0.08f), Offset((i*65f-60f)*x,100*y),Offset((i*65f+30f)*x,0f), x)
-        drawLine(accent.copy(alpha=0.25f), Offset(6*x,84*y),Offset(314*x,84*y),x)
-        val body = Path().apply {
-            moveTo(13*x,68*y); lineTo(19*x,48*y); lineTo(54*x,44*y); lineTo(103*x,18*y)
-            cubicTo(116*x,10*y,154*x,10*y,169*x,16*y); lineTo(211*x,43*y); lineTo(275*x,51*y)
-            lineTo(299*x,61*y); lineTo(307*x,73*y); lineTo(292*x,77*y); lineTo(25*x,77*y); close()
-        }
-        drawPath(body, Color(0xFF303030)); drawPath(body, accent, style=Stroke(1.5f*x))
-        val glass = Path().apply { moveTo(74*x,43*y); lineTo(109*x,23*y); lineTo(155*x,22*y); lineTo(190*x,43*y); close() }
-        drawPath(glass, Color(0xFF0C0C0C)); drawPath(glass, accent.copy(alpha=.4f), style=Stroke(x))
-        drawLine(accent.copy(alpha=.5f),Offset(135*x,24*y),Offset(145*x,43*y),x)
-        drawLine(accent.copy(alpha=.6f),Offset(102*x,59*y),Offset(212*x,59*y),x)
-        drawLine(Color(0xFFFFFFFF),Offset(278*x,54*y),Offset(296*x,60*y),2*x)
-        drawLine(RaceRed,Offset(19*x,52*y),Offset(29*x,52*y),2*x)
-        for(cx in listOf(66f,251f)) {
-            drawCircle(Color(0xFF080808),17*x,Offset(cx*x,73*y))
-            drawCircle(Color(0xFF929292),11*x,Offset(cx*x,73*y),style=Stroke(2*x))
-            drawCircle(accent,3*x,Offset(cx*x,73*y))
         }
     }
 }

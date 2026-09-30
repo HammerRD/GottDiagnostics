@@ -45,6 +45,25 @@ class MainActivity: ComponentActivity() {
         var ready by remember(guide, state.vehicleId) { mutableStateOf(false) }
         var apiKey by remember { mutableStateOf("") }
         val scope = rememberCoroutineScope()
+        val photoPrefs = remember { getSharedPreferences("vehicle_photos", MODE_PRIVATE) }
+        var photos by remember { mutableStateOf(Vehicles.all.associate { it.id to photoPrefs.getString(it.id, null) }) }
+        var photoVehicle by rememberSaveable { mutableStateOf<String?>(null) }
+        val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            val id = photoVehicle
+            photoVehicle = null
+            if(uri != null && id != null) {
+                try {
+                    contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    val old = photos[id]
+                    photoPrefs.edit().putString(id, uri.toString()).apply()
+                    photos = photos + (id to uri.toString())
+                    if(old != null && old != uri.toString() && old !in photos.values) {
+                        runCatching { contentResolver.releasePersistableUriPermission(android.net.Uri.parse(old), Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+                    }
+                    message = ""
+                } catch(e: Exception) { message = "Could not save access to this photo. Choose an image stored on your phone." }
+            }
+        }
         val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { if(it) model.refresh() else message = "Allow Nearby devices permission in Android app settings." }
         DisposableEffect(state.monitoring, tab) {
             if(state.monitoring) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -67,7 +86,7 @@ class MainActivity: ComponentActivity() {
                 when(tab) {
                     0 -> {
                         RaceHeading("01 / PADDOCK", "Your pit wall.", "Connect your machine. Find the story in the data.")
-                        VehicleHero(Vehicles.get(state.vehicleId))
+                        VehicleHero(Vehicles.get(state.vehicleId), photoUri = photos[state.vehicleId])
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             OutlinedButton(onClick = { tab = 4 }, modifier = Modifier.weight(1f)) { Text("OPEN GARAGE") }
                             OutlinedButton(onClick = { tab = 2 }, modifier = Modifier.weight(1f)) { Text("LIVE COCKPIT") }
@@ -141,7 +160,25 @@ class MainActivity: ComponentActivity() {
                     }
                     4 -> {
                         RaceHeading("05 / THE LINEUP", "Built to be driven.", "Three machines. Three different stories.")
-                        Vehicles.all.forEach { vehicle -> VehicleHero(vehicle, state.vehicleId == vehicle.id, compact = true, enabled = editable, onClick = { model.selectVehicle(vehicle.id) }) }
+                        Text("Your car photos stay on this phone and are not sent with diagnostics or AI requests.", color = RaceMuted)
+                        Vehicles.all.forEach { vehicle ->
+                            VehicleHero(vehicle, state.vehicleId == vehicle.id, compact = true, enabled = editable,
+                                onClick = { model.selectVehicle(vehicle.id) }, photoUri = photos[vehicle.id])
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(enabled = !state.monitoring, onClick = {
+                                    photoVehicle = vehicle.id
+                                    photoPicker.launch(arrayOf("image/*"))
+                                }) { Text(if(photos[vehicle.id] == null) "Add car photo" else "Change photo") }
+                                if(photos[vehicle.id] != null) TextButton(enabled = !state.monitoring, onClick = {
+                                    val old = photos[vehicle.id]
+                                    photoPrefs.edit().remove(vehicle.id).apply()
+                                    photos = photos + (vehicle.id to null)
+                                    if(old != null && old !in photos.values) runCatching {
+                                        contentResolver.releasePersistableUriPermission(android.net.Uri.parse(old), Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                }) { Text("Remove") }
+                            }
+                        }
                         RacePanel("CURRENT SETUP", Vehicles.get(state.vehicleId).details, vehicleAccent(state.vehicleId))
                         OutlinedTextField(value = state.notes, onValueChange = model::profile, label = { Text("Symptoms / additional vehicle details") }, modifier = Modifier.fillMaxWidth(), minLines = 3, enabled = editable)
                         Text("Disconnect to change vehicle details. Each connection records a snapshot of this profile. AI always uses the profile saved with the recording, even if you later select another car.")

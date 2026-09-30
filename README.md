@@ -1,16 +1,16 @@
-# Gott Diagnostics 1.3
+# Gott Diagnostics 1.4
 
 Native Kotlin / Jetpack Compose Android app for an OBDLink MX+ using Bluetooth Classic SPP. Android 8.0+ (API 26). Includes guided OBD recording and direct, owner-approved OpenAI analysis inside the app.
 
 ## Install
 
-Download `gott-diagnostics-debug.apk` from the GitHub release assets and open it on your phone. Allow installation from the file-opening app. These are development builds, not production-signed releases. The GitHub runner generates a debug signing key for each build, so Android may reject an in-place update. If an earlier version is installed, export any logs you want to keep before uninstalling it and installing 1.3. Uninstalling clears app data. The API key must be entered again after reinstalling. The release's SHA256SUMS.txt identifies the downloadable APK; a local build has a different signing key/checksum.
+Download `gott-diagnostics-debug.apk` from the GitHub release assets and open it on your phone. Allow installation from the file-opening app. These are development builds, not production-signed releases. The GitHub runner generates a debug signing key for each build, so Android may reject an in-place update. If an earlier version is installed, export any logs you want to keep before uninstalling it and installing 1.4. Uninstalling clears app data. The API key must be entered again after reinstalling. The release's SHA256SUMS.txt identifies the downloadable APK; a local build has a different signing key/checksum.
 
 ## Motorsport interface
 
-Version 1.3 adds a red, white and black design with condensed headings, stylized coupe artwork, distinct garage cards, a segmented RPM display and a two-column live telemetry dashboard. All six destinations remain visible in the bottom navigation: Link, Guides, Live, Codes, Garage and AI. Scroll position resets when switching sections, and the Stop recording button stays above the content while recording.
+Version 1.4 replaces the coupe drawings with large personal-photo cards. In Garage, choose Add car photo for each vehicle: white 2003 350Z, red 2006 350Z, and silver 2009 370Z. The Android file picker gives access only to the image you choose. Photo access is saved across app restarts; you can change or remove each photo. Keep the source image on your phone. Photos stay out of diagnostic exports and AI requests. No stock or generated car photos are bundled; until you choose one, the card shows a paint-color label and photo prompt. The red, white and black theme, segmented RPM display and two-column telemetry dashboard remain. All six destinations remain visible in the bottom navigation: Link, Guides, Live, Codes, Garage and AI. Scroll position resets when switching sections, and the Stop recording button stays above the content while recording.
 
-The RPM display is a visual scale, not an ECU redline or a recommended target. Offline/missing readings show dashes and NO DATA; stopped readings are labeled LAST READING. Vehicle illustrations are stylized, not representations of the owner's exact body modifications. The engine protocols, guide conditions, privacy controls and API behavior are unchanged.
+The RPM display is a visual scale, not an ECU redline or a recommended target. Offline/missing readings show dashes and NO DATA; stopped readings are labeled LAST READING. Your selected car photo appears in both the Garage and Paddock. The engine protocols, guide conditions, privacy controls and API behavior are unchanged.
 
 Phone-size captures from the actual Compose UI, rendered locally in Android's host test runtime (offline, no simulated vehicle readings):
 
@@ -22,9 +22,9 @@ Phone-size captures from the actual Compose UI, rendered locally in Android's ho
 
 Choose a vehicle before connecting; all are manual transmission and run owner-reported 93 octane (AKI versus RON was not specified).
 
-- 2003 350Z VQ35DE: upgraded injectors of unknown specification, aftermarket exhaust; matching calibration unknown.
-- 2006 350Z VQ35DE Rev-Up: Kinetix intake manifold, full exhaust, high-flow catalytic converters; tune unknown.
-- 2009 370Z VQ37VHR: cold-air intake, full exhaust with test pipes; UpRev tune believed to match the modifications but not confirmed.
+- White 2003 350Z VQ35DE: upgraded injectors of unknown specification, aftermarket exhaust; matching calibration unknown.
+- Red 2006 350Z VQ35DE Rev-Up: Kinetix intake manifold, full exhaust, high-flow catalytic converters; tune unknown.
+- Silver 2009 370Z VQ37VHR: cold-air intake, full exhaust with test pipes; UpRev tune believed to match the modifications but not confirmed.
 
 Add symptoms or corrections under Garage. Each connection saves a profile snapshot. Analysis uses the profile in the recording, not whichever car you later select.
 
